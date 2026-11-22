@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberfall — Duel of the Ember Pact</title>
+<style>
+  :root{
+    --bg:#14090a; --bg2:#1f0d0e; --panel:#2a1214; --panel2:#331619;
+    --gold:#f2b544; --gold2:#ffdf8a; --ember:#ff6a2a; --ember2:#ff9a3d;
+    --red:#e5484d; --green:#57c785; --blue:#6aa9ff; --ink:#f5e9d8; --mut:#c9a795;
+    --card-w:118px; --card-h:158px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; user-select:none;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #4a1710 0%, var(--bg) 55%, #0b0506 100%);
+    color:var(--ink); font-family:Georgia,'Times New Roman',serif; overflow:hidden;
+  }
+  #app{width:1280px; height:800px; margin:0 auto; position:relative; display:flex; flex-direction:column; padding:10px 14px;}
+  /* ---------- header ---------- */
+  header{display:flex; align-items:center; gap:14px; padding:6px 4px 10px; border-bottom:1px solid #5a2a1e;}
+  .logo{font-size:26px; letter-spacing:3px; color:var(--gold2); text-shadow:0 0 18px rgba(255,106,42,.55); white-space:nowrap;}
+  .logo small{display:block; font-size:11px; letter-spacing:4px; color:var(--mut);}
+  .hpbar{flex:1; display:flex; align-items:center; gap:8px;}
+  .hpbar .who{font-size:13px; width:110px; text-align:right; color:var(--mut);}
+  .hpbar .who.you{color:var(--gold2);}
+  .track{flex:1; height:18px; background:#1a0a0b; border:1px solid #6b2a1a; border-radius:9px; overflow:hidden;}
+  .fill{height:100%; transition:width .35s;}
+  .fill.you{background:linear-gradient(90deg,#ff9a3d,#ffd76a);}
+  .fill.foe{background:linear-gradient(90deg,#b3202e,#e5484d);}
+  .hpnum{font-size:15px; width:52px; text-align:center; font-weight:bold;}
+  .mana{display:flex; align-items:center; gap:5px;}
+  .mana .pip{width:16px; height:16px; border-radius:50%; border:1px solid var(--gold); background:#241014;}
+  .mana .pip.on{background:radial-gradient(circle at 35% 35%, #ffe9a8, var(--ember)); box-shadow:0 0 8px rgba(255,154,61,.8);}
+  .mana b{font-size:14px; color:var(--gold2); margin-left:4px;}
+  .turn{font-size:13px; color:var(--mut); white-space:nowrap;}
+  /* ---------- table ---------- */
+  #table{flex:1; display:flex; flex-direction:column; gap:6px; padding-top:8px;}
+  .rowlabel{display:flex; justify-content:space-between; font-size:12px; letter-spacing:2px; color:var(--mut); text-transform:uppercase; padding:0 4px;}
+  .rowlabel .handcount{color:var(--gold2); letter-spacing:0;}
+  .opp-hand{display:flex; gap:6px; height:44px; padding-left:8px; align-items:center;}
+  .mini-card{width:32px; height:44px; border-radius:4px; background:repeating-linear-gradient(45deg,#3a1418 0 6px,#2a0e12 6px 12px); border:1px solid #7a2a1c;}
+  .lanes{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; flex:1;}
+  .lane{border:1px solid #5a2a1e; border-radius:10px; background:linear-gradient(180deg,rgba(255,106,42,.05),rgba(0,0,0,.25)); min-height:158px; padding:8px 6px 6px; position:relative; display:flex; flex-direction:column; justify-content:space-evenly;}
+  .lane .lname{position:absolute; top:-9px; left:10px; background:var(--bg2); padding:0 8px; font-size:11px; letter-spacing:2px; color:var(--gold);}
+  .lane.targetable{outline:2px solid var(--gold); outline-offset:2px; cursor:pointer; box-shadow:0 0 18px rgba(242,181,68,.5);}
+  .slot{display:flex; gap:8px; justify-content:center; min-height:70px; align-items:center;}
+  .slot.foe{border-bottom:1px dashed #4a211a;}
+  .midbar{display:flex; align-items:center; gap:10px; padding:2px 4px;}
+  #log{flex:1; font-size:12.5px; color:var(--mut); font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #endturn{
+    background:linear-gradient(180deg,#ff8a3d,#d94e12); color:#fff; border:1px solid #ffb37a;
+    font-family:inherit; font-size:16px; font-weight:bold; letter-spacing:1px; padding:9px 22px;
+    border-radius:8px; cursor:pointer; box-shadow:0 3px 14px rgba(217,78,18,.5);
+  }
+  #endturn:hover{filter:brightness(1.15);}
+  #endturn:disabled{opacity:.45; cursor:default; filter:none;}
+  /* ---------- cards ---------- */
+  .card{
+    width:var(--card-w); height:var(--card-h); border-radius:9px; position:relative;
+    background:linear-gradient(165deg,#3d1a12 0%,#241016 55%,#180b0d 100%);
+    border:1px solid #8a4a28; box-shadow:0 4px 10px rgba(0,0,0,.6); cursor:pointer;
+    transition:transform .15s, box-shadow .15s; flex-shrink:0; overflow:hidden;
+  }
+  .card:hover{transform:translateY(-8px) scale(1.04); box-shadow:0 10px 22px rgba(0,0,0,.75), 0 0 14px rgba(255,154,61,.35); z-index:5;}
+  .card.selected{outline:3px solid var(--gold); transform:translateY(-10px); box-shadow:0 0 20px rgba(242,181,68,.7);}
+  .card.disabled{opacity:.55; cursor:default;}
+  .card.disabled:hover{transform:none; box-shadow:0 4px 10px rgba(0,0,0,.6);}
+  .card .art{height:62px; display:flex; align-items:center; justify-content:center; font-size:40px;
+    background:radial-gradient(circle at 50% 60%, var(--art,#ff6a2a) 0%, transparent 75%); text-shadow:0 0 16px rgba(0,0,0,.6);}
+  .card .cname{font-size:12.5px; font-weight:bold; text-align:center; padding:2px 4px 0; color:#ffe9c4; line-height:1.1; min-height:26px;}
+  .card .ctype{font-size:10px; text-align:center; color:var(--mut); letter-spacing:1px; text-transform:uppercase;}
+  .card .ctext{font-size:10.5px; line-height:1.25; text-align:center; color:#e8d5bd; padding:3px 7px; font-style:italic;}
+  .card .cost{position:absolute; top:5px; left:5px; width:26px; height:26px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #8ec9ff, #2a5fa8); color:#fff; font-weight:bold; font-size:15px;
+    display:flex; align-items:center; justify-content:center; border:1px solid #bcd8ff; box-shadow:0 0 8px rgba(106,169,255,.6);}
+  .card .atk{position:absolute; bottom:5px; left:5px; width:26px; height:26px; border-radius:4px;
+    background:linear-gradient(180deg,#e5484d,#8f1d22); color:#fff; font-weight:bold; font-size:14px;
+    display:flex; align-items:center; justify-content:center; border:1px solid #ff9a9a;}
+  .card .hp{position:absolute; bottom:5px; right:5px; width:26px; height:26px; border-radius:50%;
+    background:linear-gradient(180deg,#57c785,#1f7a44); color:#fff; font-weight:bold; font-size:14px;
+    display:flex; align-items:center; justify-content:center; border:1px solid #a5e8c0;}
+  .card.spell .atk{display:none;}
+  .card.mini{width:98px; height:130px; cursor:default;}
+  .card.mini:hover{transform:none; box-shadow:0 4px 10px rgba(0,0,0,.6);}
+  .card.mini .art{height:52px; font-size:32px;}
+  .card.mini .cname{font-size:11.5px; min-height:24px;}
+  .card.mini .ctext{display:none;}
+  .card.mini .cost{width:22px; height:22px; font-size:13px;}
+  .card.mini .atk,.card.mini .hp{width:22px; height:22px; font-size:12px;}
+  .card.hit{animation:hit .4s;}
+  @keyframes hit{0%{transform:translateX(0);}25%{transform:translateX(-6px);}50%{transform:translateX(6px);}75%{transform:translateX(-3px);}100%{transform:translateX(0);}}
+  .card.dead{opacity:0; transform:scale(.6); transition:all .4s;}
+  /* ---------- hand ---------- */
+  #hand{display:flex; gap:8px; justify-content:center; padding:8px 4px 2px; min-height:166px; align-items:flex-end;}
+  .hint{font-size:12px; color:var(--mut); text-align:center; padding-bottom:2px;}
+  .hint b{color:var(--gold2);}
+  /* ---------- overlays ---------- */
+  .overlay{position:absolute; inset:0; background:rgba(10,4,5,.82); backdrop-filter:blur(2px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:20; text-align:center;}
+  .overlay.hidden{display:none;}
+  .overlay h1{font-size:64px; letter-spacing:6px; color:var(--gold2); text-shadow:0 0 30px rgba(255,106,42,.8), 0 4px 0 #5a1a08;}
+  .overlay h2{font-size:20px; color:var(--ember2); letter-spacing:3px; font-weight:normal;}
+  .overlay p{max-width:560px; color:var(--mut); font-size:15px; line-height:1.55;}
+  .bigbtn{background:linear-gradient(180deg,#ff8a3d,#d94e12); color:#fff; border:1px solid #ffb37a; font-family:inherit;
+    font-size:20px; font-weight:bold; letter-spacing:2px; padding:14px 42px; border-radius:10px; cursor:pointer; box-shadow:0 4px 20px rgba(217,78,18,.6);}
+  .bigbtn:hover{filter:brightness(1.15);}
+  .rules{display:grid; grid-template-columns:1fr 1fr; gap:6px 26px; max-width:640px; text-align:left; font-size:13.5px; color:#e8d5bd; line-height:1.45;}
+  .rules b{color:var(--gold2);}
+  .stats{font-size:16px; color:var(--ink); line-height:1.8;}
+  .stats b{color:var(--gold2);}
+  .win h1{color:#ffd76a;}
+  .lose h1{color:#9aa3b2; text-shadow:0 0 30px rgba(120,140,180,.5), 0 4px 0 #1a1a22;}
+  #selftest-result{position:absolute; bottom:2px; right:8px; font-size:11px; color:#5a4a3a;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">EMBERFALL<small>DUEL OF THE EMBER PACT</small></div>
+    <div class="hpbar" id="foeHpBar" title="Click to target with Fireball"><span class="who">VEX · ASH SEER</span><div class="track"><div class="fill foe" id="foeHpFill" style="width:100%"></div></div><span class="hpnum" id="foeHp">20 / 20</span></div>
+    <div class="mana" id="mana"></div>
+    <div class="hpbar"><span class="who you">YOU · KESTREL</span><div class="track"><div class="fill you" id="youHpFill" style="width:100%"></div></div><span class="hpnum" id="youHp">20 / 20</span></div>
+    <div class="turn" id="turnLabel">Turn 1</div>
+  </header>
+
+  <div id="table">
+    <div class="rowlabel"><span>Opponent's hand</span><span class="handcount" id="foeHandCount"></span></div>
+    <div class="opp-hand" id="foeHand"></div>
+    <div class="lanes" id="lanes"></div>
+    <div class="midbar">
+      <div id="log">The pact is sealed. Strike first, Kestrel.</div>
+      <button id="endturn">END TURN ⏎</button>
+    </div>
+  </div>
+
+  <div id="hand"></div>
+  <div class="hint" id="hint">Click a card, then a lane — <b>1–5</b> select · <b>Enter</b> end turn · <b>Esc</b> cancel</div>
+
+  <div class="overlay" id="titleScreen">
+    <h1>EMBERFALL</h1>
+    <h2>DUEL OF THE EMBER PACT</h2>
+    <p>Two ember mages. Three burning lanes. One pact, sealed in fire. Outwit Vex the Ash Seer before your own flame gutters out.</p>
+    <div class="rules">
+      <div><b>Mana</b> — grows by 1 each turn, up to 10. Spend it to play cards.</div>
+      <div><b>Creatures</b> — played into a lane; at turn's end they strike the foe across from them, or the enemy mage.</div>
+      <div><b>Spells</b> — fireballs, mending flames and ember draws. Click a card, then its target.</div>
+      <div><b>Victory</b> — reduce Vex to 0 health. Lose yours, and the pact claims you.</div>
+    </div>
+    <button class="bigbtn" id="startBtn">BEGIN THE DUEL</button>
+    <p style="font-size:12px">An original card game · no account, no network, no mercy</p>
+  </div>
+
+  <div class="overlay hidden win" id="winScreen">
+    <h1>VICTORY</h1>
+    <h2>THE PACT IS YOURS</h2>
+    <p>Vex's flame dies to an ember. The lanes cool, the pact burns your name into the ash.</p>
+    <div class="stats" id="winStats"></div>
+    <button class="bigbtn" id="againBtn">DUEL AGAIN</button>
+  </div>
+
+  <div class="overlay hidden lose" id="loseScreen">
+    <h1>DEFEAT</h1>
+    <h2>THE EMBER CLAIMS YOU</h2>
+    <p>Your flame gutters out. Vex gathers the ashes — and waits for a rematch.</p>
+    <div class="stats" id="loseStats"></div>
+    <button class="bigbtn" id="retryBtn">TRY AGAIN</button>
+  </div>
+  <div id="selftest-result"></div>
+</div>
+
+<script>
+'use strict';
+/* ================= Emberfall — a 3-lane ember-mage card duel =================
+   Original game. One file, no network, no libraries. Keyboard + mouse. */
+
+const CARDS = [
+  {id:'imp',    name:'Ember Imp',     type:'creature', cost:1, atk:1, hp:1, art:'✦', tint:'#ff6a2a', text:'A spark with ambition.'},
+  {id:'sprite', name:'Coal Sprite',   type:'creature', cost:1, atk:2, hp:1, art:'❋', tint:'#c98a4b', text:'Burns twice as bright.'},
+  {id:'wisp',   name:'Flame Wisp',    type:'creature', cost:1, atk:1, hp:2, art:'✧', tint:'#ffd76a', text:'It never quite goes out.'},
+  {id:'fox',    name:'Spark Fox',     type:'creature', cost:2, atk:3, hp:1, art:'✜', tint:'#ff9a3d', text:'Fast as a struck match.'},
+  {id:'wolf',   name:'Cinder Wolf',   type:'creature', cost:2, atk:2, hp:2, art:'☾', tint:'#b9a7ff', text:'Howls in smoke, not sound.'},
+  {id:'knight', name:'Ember Knight',  type:'creature', cost:2, atk:2, hp:3, art:'♞', tint:'#e8e8e8', text:'Sworn to the last coal.'},
+  {id:'hound',  name:'Blaze Hound',   type:'creature', cost:3, atk:3, hp:2, art:'❖', tint:'#ff5a3d', text:'It fetches only fire.'},
+  {id:'serpent',name:'Lava Serpent',  type:'creature', cost:3, atk:3, hp:3, art:'〜', tint:'#ff7a1a', text:'A river that learned to bite.'},
+  {id:'golem',  name:'Ash Golem',     type:'creature', cost:3, atk:2, hp:4, art:'⬢', tint:'#9a8a7a', text:'Slow. Patient. Unburnable.'},
+  {id:'drake',  name:'Pyre Drake',    type:'creature', cost:4, atk:4, hp:3, art:'☄', tint:'#ff4d2a', text:'Its shadow smells of smoke.'},
+  {id:'phoenix',name:'Inferno Phoenix',type:'creature',cost:5, atk:5, hp:4, art:'✺', tint:'#ffb13d', text:'Dies beautifully. Returns.'},
+  {id:'colossus',name:'Magma Colossus',type:'creature',cost:6, atk:6, hp:6, art:'♜', tint:'#d94e12', text:'The mountain stood up.'},
+  {id:'fireball',name:'Fireball',     type:'spell', cost:2, art:'●', tint:'#ff3d2a', text:'Deal 3 damage to any creature or mage.', target:'any'},
+  {id:'mend',   name:'Mend Flame',    type:'spell', cost:2, art:'✚', tint:'#57c785', text:'Restore 4 health to your mage.', target:'self'},
+  {id:'draw',   name:'Ember Draw',    type:'spell', cost:1, art:'≣', tint:'#6aa9ff', text:'Draw 2 cards.', target:'none'},
+  {id:'blast',  name:'Cinder Blast',  type:'spell', cost:4, art:'✹', tint:'#ff8a2a', text:'Deal 2 damage to all enemy creatures.', target:'none'},
+];
+const DECK = [
+  'imp','imp','sprite','sprite','wisp','wisp','fox','fox','wolf','wolf','knight','knight',
+  'hound','hound','serpent','serpent','golem','golem','drake','drake','phoenix','colossus',
+  'fireball','fireball','mend','mend','draw','draw','blast','blast',
+];
+const LANES = ['Ash Lane','Cinder Lane','Pyre Lane'];
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+
+function shuffle(a, rnd){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function mulberry32(seed){ let a=seed>>>0; return function(){ a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+
+let G = null;
+function newGame(seed){
+  const rnd = mulberry32(seed || (Date.now()%2147483647));
+  G = {
+    turn:1, phase:'player', over:false, selected:null, seed,
+    you:{hp:20, maxHp:20, mana:1, maxMana:1, deck:shuffle(DECK.slice(), rnd), hand:[], board:[[],[],[]], played:0, dmg:0},
+    foe:{hp:20, maxHp:20, mana:1, maxMana:1, deck:shuffle(DECK.slice(), rnd), hand:[], board:[[],[],[]], played:0, dmg:0},
+    log:[],
+  };
+  for(let i=0;i<4;i++){ drawCard(G.you); drawCard(G.foe); }
+  render();
+}
+function drawCard(p){ if(p.deck.length && p.hand.length<7) p.hand.push(p.deck.pop()); }
+function cardDef(id){ return CARDS.find(c=>c.id===id); }
+
+function logMsg(t){ G.log.unshift(t); G.log = G.log.slice(0,3); $('#log').textContent = G.log.join(' · '); }
+
+function cardEl(def, opts){
+  opts = opts || {};
+  const el = document.createElement('div');
+  el.className = 'card' + (def.type==='spell' ? ' spell' : '') + (opts.mini ? ' mini' : '');
+  el.style.setProperty('--art', def.tint);
+  el.innerHTML =
+    '<div class="cost">'+def.cost+'</div>'+
+    '<div class="art">'+def.art+'</div>'+
+    '<div class="cname">'+def.name+'</div>'+
+    '<div class="ctype">'+def.type+'</div>'+
+    '<div class="ctext">'+def.text+'</div>'+
+    (def.type==='creature' ? '<div class="atk">'+def.atk+'</div><div class="hp">'+def.hp+'</div>' : '');
+  if(opts.hp !== undefined){
+    const hpEl = el.querySelector('.hp'); if(hpEl) hpEl.textContent = opts.hp + '/' + def.hp;
+  }
+  if(opts.onClick) el.addEventListener('click', e=>{ e.stopPropagation(); opts.onClick(); });
+  return el;
+}
+
+function render(){
+  $('#youHp').textContent = G.you.hp+' / '+G.you.maxHp;
+  $('#foeHp').textContent = G.foe.hp+' / '+G.foe.maxHp;
+  $('#youHpFill').style.width = Math.max(0, G.you.hp/G.you.maxHp*100)+'%';
+  $('#foeHpFill').style.width = Math.max(0, G.foe.hp/G.foe.maxHp*100)+'%';
+  $('#turnLabel').textContent = 'Turn '+G.turn;
+  const mana = $('#mana'); mana.innerHTML = '';
+  for(let i=0;i<10;i++){ const p=document.createElement('span'); p.className='pip'+(i<G.you.mana?' on':''); mana.appendChild(p); }
+  mana.appendChild(Object.assign(document.createElement('b'),{textContent:G.you.mana+'/'+G.you.maxMana}));
+  $('#foeHandCount').textContent = G.foe.hand.length+' cards';
+  const fh = $('#foeHand'); fh.innerHTML='';
+  G.foe.hand.forEach(()=> fh.appendChild(document.createElement('div')).className='mini-card');
+  const lanes = $('#lanes'); lanes.innerHTML='';
+  LANES.forEach((name, li)=>{
+    const lane = document.createElement('div');
+    lane.className = 'lane' + (G.selected && cardDef(G.selected).type==='creature' ? ' targetable' : '');
+    lane.innerHTML = '<div class="lname">'+name+'</div>';
+    const foeSlot = document.createElement('div'); foeSlot.className='slot foe';
+    G.foe.board[li].forEach(c=> foeSlot.appendChild(cardEl(cardDef(c.id), {mini:true, hp:c.hp, onClick:()=>onTarget('foe-creature', li, c)})));
+    const youSlot = document.createElement('div'); youSlot.className='slot';
+    G.you.board[li].forEach(c=> youSlot.appendChild(cardEl(cardDef(c.id), {mini:true, hp:c.hp, onClick:()=>onTarget('you-creature', li, c)})));
+    lane.appendChild(foeSlot); lane.appendChild(youSlot);
+    lane.addEventListener('click', ()=>{ if(G.selected && cardDef(G.selected).type==='creature') playCreature(li); });
+    lanes.appendChild(lane);
+  });
+  const hand = $('#hand'); hand.innerHTML='';
+  G.you.hand.forEach((id, i)=>{
+    const def = cardDef(id);
+    const el = cardEl(def, {onClick:()=>selectCard(i)});
+    if(G.selected===id && G.selectedIdx===i) el.classList.add('selected');
+    if(G.phase!=='player' || def.cost>G.you.mana) el.classList.add('disabled');
+    hand.appendChild(el);
+  });
+  $('#endturn').disabled = G.phase!=='player' || G.over;
+  $('#hint').innerHTML = G.selected
+    ? 'Selected <b>'+cardDef(G.selected).name+'</b> — '+(cardDef(G.selected).type==='creature' ? 'click a lane to summon it.' : spellHint(cardDef(G.selected)))
+    : 'Click a card, then a lane — <b>1–5</b> select · <b>Enter</b> end turn · <b>Esc</b> cancel';
+}
+function spellHint(def){
+  if(def.target==='any') return 'click an enemy creature, the enemy mage, or your own creature.';
+  if(def.target==='self') return 'click it again to cast.';
+  return 'click it again to cast.';
+}
+
+function selectCard(i){
+  if(G.phase!=='player' || G.over) return;
+  const id = G.you.hand[i], def = cardDef(id);
+  if(def.cost > G.you.mana){ logMsg('Not enough mana for '+def.name+'.'); return; }
+  if(G.selectedIdx===i){ G.selected=null; G.selectedIdx=null; }
+  else { G.selected=id; G.selectedIdx=i; }
+  if(def.type==='spell' && (def.target==='none' || def.target==='self')){ castSpell(i); }
+  render();
+}
+function playCreature(lane){
+  if(!G.selected || G.phase!=='player') return;
+  const def = cardDef(G.selected);
+  if(def.type!=='creature') return;
+  const idx = G.selectedIdx;
+  G.you.mana -= def.cost;
+  G.you.hand.splice(idx,1);
+  G.you.board[lane].push({id:def.id, hp:def.hp});
+  G.you.played++;
+  logMsg('You summon '+def.name+' to '+LANES[lane]+'.');
+  sfx(660);
+  G.selected=null; G.selectedIdx=null;
+  render();
+}
+function onTarget(kind, lane, c){
+  if(!G.selected || G.phase!=='player') return;
+  const def = cardDef(G.selected);
+  if(def.type!=='spell' || def.id!=='fireball') return;
+  if(kind==='foe-creature'){ damageCreature(G.foe, lane, c, 3); logMsg('Fireball scorches '+cardDef(c.id).name+' for 3.'); }
+  else if(kind==='you-creature'){ damageCreature(G.you, lane, c, 3); logMsg('Fireball scorches your own '+cardDef(c.id).name+' for 3.'); }
+  else return;
+  spendSpell();
+}
+function onFaceTarget(){
+  if(!G.selected || G.phase!=='player') return;
+  const def = cardDef(G.selected);
+  if(def.type!=='spell' || def.id!=='fireball') return;
+  damageHero(G.foe, 3);
+  logMsg('Fireball strikes Vex for 3.');
+  spendSpell();
+}
+function spendSpell(){
+  const idx = G.selectedIdx, def = cardDef(G.selected);
+  G.you.mana -= def.cost;
+  G.you.hand.splice(idx,1);
+  G.you.played++;
+  sfx(880);
+  G.selected=null; G.selectedIdx=null;
+  render(); checkEnd();
+}
+function castSpell(i){
+  const def = cardDef(G.you.hand[i]);
+  if(def.id==='draw'){ G.you.mana-=def.cost; G.you.hand.splice(i,1); drawCard(G.you); drawCard(G.you); logMsg('You draw 2 cards.'); G.you.played++; sfx(880); G.selected=null; G.selectedIdx=null; render(); return; }
+  if(def.id==='blast'){ G.you.mana-=def.cost; G.you.hand.splice(i,1); G.foe.board.forEach((lane,li)=> lane.forEach(c=> damageCreature(G.foe, li, c, 2))); logMsg('Cinder Blast washes over the enemy lines.'); G.you.played++; sfx(440); G.selected=null; G.selectedIdx=null; render(); checkEnd(); return; }
+  if(def.id==='mend'){ healYou(4); G.you.mana-=def.cost; G.you.hand.splice(i,1); G.you.played++; sfx(880); G.selected=null; G.selectedIdx=null; render(); return; }
+}
+function healYou(n){ G.you.hp = Math.min(G.you.maxHp, G.you.hp+n); logMsg('Mend Flame restores '+n+' health.'); }
+function damageCreature(owner, lane, c, n){
+  c.hp -= n;
+  if(c.hp<=0){
+    const arr = owner.board[lane];
+    const k = arr.indexOf(c); if(k>=0) arr.splice(k,1);
+    logMsg(cardDef(c.id).name+' is destroyed.');
+  }
+}
+function damageHero(owner, n){
+  owner.hp -= n;
+  if(owner===G.foe) G.you.dmg += n; else G.foe.dmg += n;
+  if(owner.hp<=0) owner.hp = 0;
+}
+
+function endTurn(){
+  if(G.phase!=='player' || G.over) return;
+  G.selected=null; G.selectedIdx=null;
+  G.phase='ai';
+  render();
+  setTimeout(aiTurn, 500);
+}
+function aiTurn(){
+  if(G.over) return;
+  const foe = G.foe, rnd = Math.random;
+  foe.maxMana = Math.min(10, foe.maxMana+1); foe.mana = foe.maxMana;
+  drawCard(foe);
+  // play creatures into the weakest lane
+  let guard = 0;
+  while(guard++ < 12){
+    const playable = foe.hand.map((id,i)=>({def:cardDef(id), i})).filter(x=>x.def.cost<=foe.mana);
+    if(!playable.length) break;
+    const pick = playable[Math.floor(rnd()*playable.length)];
+    if(pick.def.type==='creature'){
+      let lane = 0, best = 99;
+      foe.board.forEach((l,li)=>{ if(l.length<best){ best=l.length; lane=li; } });
+      foe.mana -= pick.def.cost; foe.hand.splice(pick.i,1);
+      foe.board[lane].push({id:pick.def.id, hp:pick.def.hp});
+      foe.played++;
+      logMsg('Vex summons '+pick.def.name+'.');
+    } else if(pick.def.id==='fireball'){
+      const targets = [];
+      G.you.board.forEach((l,li)=> l.forEach(c=> targets.push({lane:li, c})));
+      foe.mana -= pick.def.cost; foe.hand.splice(pick.i,1);
+      if(targets.length && (G.you.hp<=3 || rnd()<0.7)){
+        const t = targets.sort((a,b)=>cardDef(b.c.id).atk-cardDef(a.c.id).atk)[0];
+        damageCreature(G.you, t.lane, t.c, 3); logMsg('Vex hurls a Fireball.');
+      } else { damageHero(G.you, 3); logMsg('Vex hurls a Fireball at you.'); }
+      foe.played++;
+    } else if(pick.def.id==='mend' && foe.hp<=12){
+      foe.mana -= pick.def.cost; foe.hand.splice(pick.i,1);
+      foe.hp = Math.min(foe.maxHp, foe.hp+4); logMsg('Vex mends her flame.');
+      foe.played++;
+    } else if(pick.def.id==='draw' && foe.hand.length<4){
+      foe.mana -= pick.def.cost; foe.hand.splice(pick.i,1);
+      drawCard(foe); drawCard(foe); logMsg('Vex draws two cards.');
+      foe.played++;
+    } else if(pick.def.id==='blast'){
+      foe.mana -= pick.def.cost; foe.hand.splice(pick.i,1);
+      G.you.board.forEach((lane,li)=> lane.forEach(c=> damageCreature(G.you, li, c, 2)));
+      logMsg('Vex unleashes Cinder Blast.');
+      foe.played++;
+    } else break;
+  }
+  render();
+  setTimeout(combat, 700);
+}
+function combat(){
+  if(G.over) return;
+  let events = [];
+  for(let li=0; li<3; li++){
+    const y = G.you.board[li][0], f = G.foe.board[li][0];
+    if(y && f){
+      const yd = cardDef(y.id), fd = cardDef(f.id);
+      damageCreature(G.foe, li, f, yd.atk);
+      damageCreature(G.you, li, y, fd.atk);
+      events.push(yd.name+' trades blows with '+fd.name+'.');
+    } else if(y){ damageHero(G.foe, cardDef(y.id).atk); events.push(cardDef(y.id).name+' strikes Vex for '+cardDef(y.id).atk+'.'); }
+    else if(f){ damageHero(G.you, cardDef(f.id).atk); events.push(cardDef(f.id).name+' strikes you for '+cardDef(f.id).atk+'.'); }
+  }
+  logMsg(events.length ? events.join(' ') : 'The lanes fall silent.');
+  sfx(220);
+  render();
+  if(checkEnd()) return;
+  G.turn++;
+  G.you.maxMana = Math.min(10, G.you.maxMana+1); G.you.mana = G.you.maxMana;
+  drawCard(G.you);
+  G.phase='player';
+  logMsg('Turn '+G.turn+' — your move.');
+  render();
+}
+function checkEnd(){
+  if(G.you.hp<=0 || G.foe.hp<=0){
+    G.over = true;
+    const won = G.foe.hp<=0;
+    const stats = 'Turns: <b>'+G.turn+'</b> · Cards played: <b>'+G.you.played+'</b> · Damage dealt: <b>'+G.you.dmg+'</b>';
+    if(won){ $('#winStats').innerHTML = stats; $('#winScreen').classList.remove('hidden'); }
+    else { $('#loseStats').innerHTML = stats; $('#loseScreen').classList.remove('hidden'); }
+    render();
+    return true;
+  }
+  return false;
+}
+
+/* ---------- audio (tiny WebAudio blips, no files) ---------- */
+let AC = null, muted = false;
+function sfx(freq){
+  if(muted) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type='triangle'; o.frequency.value=freq;
+    g.gain.setValueAtTime(0.06, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+0.18);
+    o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.2);
+  }catch(e){}
+}
+
+/* ---------- input ---------- */
+$('#foeHpBar').addEventListener('click', onFaceTarget);
+$('#endturn').addEventListener('click', endTurn);
+$('#startBtn').addEventListener('click', ()=>{ $('#titleScreen').classList.add('hidden'); sfx(520); });
+$('#againBtn').addEventListener('click', ()=>location.reload());
+$('#retryBtn').addEventListener('click', ()=>location.reload());
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !$('#titleScreen').classList.contains('hidden')){ $('#titleScreen').classList.add('hidden'); return; }
+  if(e.key==='Enter'){ endTurn(); return; }
+  if(e.key==='Escape'){ G.selected=null; G.selectedIdx=null; render(); return; }
+  const n = parseInt(e.key,10);
+  if(n>=1 && n<=G.you.hand.length) selectCard(n-1);
+});
+
+/* ---------- screenshot / self-test presets ---------- */
+function presetShot(kind){
+  newGame(42);
+  $('#titleScreen').classList.add('hidden');
+  if(kind==='title'){ $('#titleScreen').classList.remove('hidden'); return; }
+  // build a mid-game table
+  const put=(side,id,lane,hp)=>{ const d=cardDef(id); side.board[lane].push({id, hp: hp ?? d.hp}); };
+  put(G.you,'knight',0); put(G.you,'wolf',1); put(G.you,'drake',2);
+  put(G.foe,'golem',0); put(G.foe,'serpent',1); put(G.foe,'hound',2);
+  G.you.mana=6; G.you.maxMana=6; G.you.hp=14; G.foe.hp=11; G.turn=6;
+  G.you.played=7; G.you.dmg=9;
+  G.you.hand=['fireball','phoenix','mend','imp','draw'];
+  logMsg('Vex summons Pyre Drake. · You summon Ember Knight to Ash Lane.');
+  if(kind==='win'){ G.foe.hp=0; checkEnd(); }
+  if(kind==='loss'){ G.you.hp=0; checkEnd(); }
+  render();
+}
+function selfTest(seed){
+  newGame(seed||7);
+  $('#titleScreen').classList.add('hidden');
+  let guard=0;
+  const rnd = mulberry32((seed||7)+1);
+  while(!G.over && guard++<200){
+    // player: random legal plays
+    let moved=true;
+    while(moved){
+      moved=false;
+      const affordable = G.you.hand.map((id,i)=>({def:cardDef(id),i})).filter(x=>x.def.cost<=G.you.mana);
+      if(!affordable.length) break;
+      const pick = affordable[Math.floor(rnd()*affordable.length)];
+      G.selected=pick.def.id; G.selectedIdx=pick.i;
+      if(pick.def.type==='creature'){ playCreature(Math.floor(rnd()*3)); moved=true; }
+      else if(pick.def.id==='draw'||pick.def.id==='mend'||pick.def.id==='blast'){ castSpell(pick.i); moved=true; }
+      else if(pick.def.id==='fireball'){
+        const t=[]; G.foe.board.forEach((l,li)=>l.forEach(c=>t.push({lane:li,c})));
+        if(t.length){ const x=t[0]; damageCreature(G.foe,x.lane,x.c,3); }
+        else damageHero(G.foe,3);
+        G.you.mana-=2; G.you.hand.splice(pick.i,1); G.you.played++;
+        G.selected=null; G.selectedIdx=null; moved=true;
+      }
+      if(checkEnd()) break;
+    }
+    if(G.over) break;
+    // AI turn synchronously (reuse logic without timers)
+    G.phase='ai';
+    const foe=G.foe;
+    foe.maxMana=Math.min(10,foe.maxMana+1); foe.mana=foe.maxMana; drawCard(foe);
+    let g2=0;
+    while(g2++<12){
+      const playable = foe.hand.map((id,i)=>({def:cardDef(id),i})).filter(x=>x.def.cost<=foe.mana);
+      if(!playable.length) break;
+      const pick=playable[Math.floor(rnd()*playable.length)];
+      if(pick.def.type==='creature'){
+        let lane=0,best=99; foe.board.forEach((l,li)=>{ if(l.length<best){best=l.length;lane=li;} });
+        foe.mana-=pick.def.cost; foe.hand.splice(pick.i,1);
+        foe.board[lane].push({id:pick.def.id,hp:pick.def.hp}); foe.played++;
+      } else break;
+    }
+    combatSync();
+    if(G.over) break;
+    G.turn++; G.you.maxMana=Math.min(10,G.you.maxMana+1); G.you.mana=G.you.maxMana; drawCard(G.you);
+    G.phase='player';
+  }
+  function combatSync(){
+    for(let li=0;li<3;li++){
+      const y=G.you.board[li][0], f=G.foe.board[li][0];
+      if(y&&f){ const yd=cardDef(y.id),fd=cardDef(f.id); damageCreature(G.foe,li,f,yd.atk); damageCreature(G.you,li,y,fd.atk); }
+      else if(y) damageHero(G.foe,cardDef(y.id).atk);
+      else if(f) damageHero(G.you,cardDef(f.id).atk);
+    }
+    checkEnd();
+  }
+  const winner = G.foe.hp<=0 ? 'YOU' : (G.you.hp<=0 ? 'VEX' : 'TIMEOUT');
+  const res = 'SELFTEST WINNER: '+winner+' turns='+G.turn+' youHP='+G.you.hp+' foeHP='+G.foe.hp;
+  $('#selftest-result').textContent = res;
+  document.title = res;
+  render();
+  return res;
+}
+
+if(params.get('shot')){ presetShot(params.get('shot')); }
+else if(params.get('selftest')){ selfTest(parseInt(params.get('selftest'),10)||7); }
+else { newGame(); }
+</script>
+</body>
+</html>
